@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as nodemailer from 'nodemailer';
+import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -12,25 +13,27 @@ export async function POST(request: NextRequest) {
     debugLog.push(`[${new Date().toISOString()}] Starting SMTP test`);
     debugLog.push(`Host: ${host}:${port}, Secure: ${secure}`);
 
-    // Create transporter with debug enabled
-    const transporter = nodemailer.createTransport({
+    const transportOptions: SMTPTransport.Options = {
       host,
       port: parseInt(port),
       secure: secure === 'true' || secure === true,
       auth: user ? { user, pass } : undefined,
       debug: true,
       logger: {
-        debug: (info: any) => debugLog.push(`[DEBUG] ${JSON.stringify(info)}`),
-        info: (info: any) => debugLog.push(`[INFO] ${JSON.stringify(info)}`),
-        warn: (info: any) => debugLog.push(`[WARN] ${JSON.stringify(info)}`),
-        error: (info: any) => debugLog.push(`[ERROR] ${JSON.stringify(info)}`),
-        log: (info: any) => debugLog.push(`[LOG] ${JSON.stringify(info)}`),
-        trace: (info: any) => debugLog.push(`[TRACE] ${JSON.stringify(info)}`),
+        level: 'debug' as const,
+        debug: (info: unknown) => debugLog.push(`[DEBUG] ${JSON.stringify(info)}`),
+        info: (info: unknown) => debugLog.push(`[INFO] ${JSON.stringify(info)}`),
+        warn: (info: unknown) => debugLog.push(`[WARN] ${JSON.stringify(info)}`),
+        error: (info: unknown) => debugLog.push(`[ERROR] ${JSON.stringify(info)}`),
+        log: (info: unknown) => debugLog.push(`[LOG] ${JSON.stringify(info)}`),
+        trace: (info: unknown) => debugLog.push(`[TRACE] ${JSON.stringify(info)}`),
       },
       tls: {
-        rejectUnauthorized: false, // For testing self-signed certs
+        rejectUnauthorized: false,
       },
-    });
+    };
+
+    const transporter = nodemailer.createTransport(transportOptions);
 
     // Verify connection
     debugLog.push(`[${new Date().toISOString()}] Verifying connection...`);
@@ -61,20 +64,21 @@ export async function POST(request: NextRequest) {
       debugLog,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    debugLog.push(`[${new Date().toISOString()}] Error: ${error.message}`);
+    const err = error as { message?: string; code?: string; command?: string; responseCode?: number; response?: string; stack?: string };
+    debugLog.push(`[${new Date().toISOString()}] Error: ${err.message}`);
     
     return NextResponse.json({
       success: false,
       duration: `${duration}ms`,
       error: {
-        message: error.message,
-        code: error.code,
-        command: error.command,
-        responseCode: error.responseCode,
-        response: error.response,
-        stack: error.stack,
+        message: err.message,
+        code: err.code,
+        command: err.command,
+        responseCode: err.responseCode,
+        response: err.response,
+        stack: err.stack,
       },
       debugLog,
     }, { status: 500 });
