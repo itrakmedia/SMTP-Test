@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -13,27 +12,18 @@ export async function POST(request: NextRequest) {
     debugLog.push(`[${new Date().toISOString()}] Starting SMTP test`);
     debugLog.push(`Host: ${host}:${port}, Secure: ${secure}`);
 
-    const transportOptions: SMTPTransport.Options = {
+    // Create transporter with debug enabled
+    const transporter = nodemailer.createTransport({
       host,
       port: parseInt(port),
       secure: secure === 'true' || secure === true,
       auth: user ? { user, pass } : undefined,
       debug: true,
-      logger: {
-        level: 'debug' as const,
-        debug: (info: unknown) => debugLog.push(`[DEBUG] ${JSON.stringify(info)}`),
-        info: (info: unknown) => debugLog.push(`[INFO] ${JSON.stringify(info)}`),
-        warn: (info: unknown) => debugLog.push(`[WARN] ${JSON.stringify(info)}`),
-        error: (info: unknown) => debugLog.push(`[ERROR] ${JSON.stringify(info)}`),
-        log: (info: unknown) => debugLog.push(`[LOG] ${JSON.stringify(info)}`),
-        trace: (info: unknown) => debugLog.push(`[TRACE] ${JSON.stringify(info)}`),
-      },
+      logger: true,
       tls: {
         rejectUnauthorized: false,
       },
-    };
-
-    const transporter = nodemailer.createTransport(transportOptions);
+    } as nodemailer.TransportOptions);
 
     // Verify connection
     debugLog.push(`[${new Date().toISOString()}] Verifying connection...`);
@@ -66,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const err = error as { message?: string; code?: string; command?: string; responseCode?: number; response?: string; stack?: string };
+    const err = error as Record<string, unknown>;
     debugLog.push(`[${new Date().toISOString()}] Error: ${err.message}`);
     
     return NextResponse.json({
